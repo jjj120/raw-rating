@@ -16,7 +16,7 @@ class ImageApp:
         ctk.set_appearance_mode("system")
         
         self.root = root
-        self.root.minsize(400, 300)
+        self.root.minsize(500, 200)
         self.root.title("Image Viewer")
         self.state = AppState.PATH_SELECTION
         
@@ -32,7 +32,9 @@ class ImageApp:
         self.root.bind("<Configure>", self.on_resize)
         
         self.root.bind("<Left>", lambda event: self.previous_image())
+        self.root.bind("<Up>", lambda event: self.previous_image())
         self.root.bind("<Right>", lambda event: self.next_image())
+        self.root.bind("<Down>", lambda event: self.next_image())
         
         self.root.bind("1", lambda event: self.change_rating(1))
         self.root.bind("2", lambda event: self.change_rating(2))
@@ -88,7 +90,7 @@ class ImageApp:
         self.path_selection = PathSelection(self.root_frame, self.folder_name, self.folder_name_var, self.on_select_folder)
 
     def on_select_folder(self) -> None:
-        # root.attributes('-zoomed', False)
+        self.root.attributes('-zoomed', False)
         
         self.folder_name = self.folder_name_var.get()
         print(f"Selected folder {self.folder_name}")

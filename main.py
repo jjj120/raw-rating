@@ -10,12 +10,10 @@ from util import check_image_folder
 def main():
     folder = '/mnt/daten/1 Fotos/2024/2024-04-01 Ostermontag'
     
-
     if check_image_folder(folder):
         root = ctk.CTk()
-        root.title("CR3 Image Viewer")
-        # app = ImageDisplay(root, images)
         app = ImageApp(root, folder)
+        app.create_widgets()
         root.mainloop()
     else:
         print("No CR3 images found in the folder.")

@@ -40,14 +40,14 @@ class ImageDisplay:
         self.image_info_frame = ctk.CTkFrame(self.root)
         self.image_info_frame.grid(row=0, column=0, sticky="nsew", padx=self.padding, pady=self.padding)
         
-        self.image_list_frame = ctk.CTkFrame(self.root)
-        self.image_list_frame.grid(row=1, column=0, sticky="nsew", padx=self.padding, pady=self.padding)
-        
         self.control_frame = ctk.CTkFrame(self.root)
         self.control_frame.grid(row=2, column=0, sticky="nsew", padx=self.padding, pady=self.padding)
         
         self.image_view_frame = ctk.CTkFrame(self.root)
         self.image_view_frame.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=self.padding, pady=self.padding)
+        
+        self.image_list_frame = ctk.CTkFrame(self.root)
+        self.image_list_frame.grid(row=1, column=0, sticky="nsew", padx=self.padding, pady=self.padding)
         
         self.create_image_info()
         self.create_image_list()
@@ -58,25 +58,30 @@ class ImageDisplay:
         self.image_info = ImageInfo(self.image_info_frame, self.images, self.current_index_var)
     
     def create_image_list(self):
-        self.image_list = ImageList(self.image_list_frame, self.images, self.current_index_var)
+        self.image_list = ImageList(self.image_list_frame, self.images, self.current_index_var, self.refresh_new_image_selection)
         
     def create_image_view(self):
         self.image_view = ImageView(self.image_view_frame, self.images, self.current_index_var)
     
     def refresh_image_info(self):
-        self.image_info.create_widgets()
+        self.image_info.update_exif_data()
     
     def refresh_image_list(self):
-        self.image_list.create_widgets()
+        self.image_list.refresh_metadata()
     
     def refresh_image_view(self):
         self.image_view.create_widgets()
     
+    def refresh_new_image_selection(self):
+        print("Refresh due to new image selection to " + str(self.current_index_var.get()))
+        self.refresh_image_info()
+        self.refresh_image_view()
+    
     def create_control(self):
         self.button_path_selection = ctk.CTkButton(self.control_frame, text="Path Selection", command=self.changeToPathSelection)
         self.button_path_selection.place(relx=0.4, rely=0.5, anchor="e")
-        self.button_image_list = ctk.CTkButton(self.control_frame, text="Image List", command=self.changeToImageList)
-        self.button_image_list.place(relx=0.6, rely=0.5, anchor="w")
+        # self.button_image_list = ctk.CTkButton(self.control_frame, text="Image List", command=self.changeToImageList)
+        # self.button_image_list.place(relx=0.6, rely=0.5, anchor="w")
     
     def change_rating(self, rating: int):
         with ExifToolHelper() as et:
@@ -86,8 +91,8 @@ class ImageDisplay:
                 params=["-P", "-overwrite_original"]
             )
         print(f"Rating of {self.images[self.current_index_var.get()][1]} changed to {rating}")
-        self.create_image_info()
-        self.create_image_list()
+        self.refresh_image_info()
+        self.refresh_image_list()
         
 if __name__ == "__main__":
     from imageApp import ImageApp
