@@ -117,24 +117,58 @@ class ImageInfo:
             self.reset_vars()
             return
         
-        self.filename_var.set(curr_image_path.split("/")[-1])
-        self.cam_type_var.set(exif_info["EXIF:Model"])
-        self.lens_type_var.set(exif_info["EXIF:LensModel"])
-        self.date_time_var.set(exif_info["EXIF:DateTimeOriginal"])
-        self.focal_length_var.set(f"{exif_info["EXIF:FocalLength"]}mm")
-        self.exposure_time_var.set(f"1/{1/exif_info["EXIF:ExposureTime"]}s")
-        self.aperture_var.set(f"F{exif_info["EXIF:FNumber"]}")
-        self.iso_var.set(exif_info["EXIF:ISO"])
+        if curr_image_path != None:
+            self.filename_var.set(curr_image_path.split("/")[-1])
+        else:
+            self.filename_var.set("")
         
-        rating = exif_info["XMP:Rating"]
-        rating_str = ""
-        for i in range(1, 6):
-            if i <= rating:
-                rating_str += "★"
-            else:
-                rating_str += "☆"
+        if "EXIF:Model" in exif_info.keys():
+            self.cam_type_var.set(exif_info["EXIF:Model"])
+        else:
+            self.cam_type_var.set("Unknown")
         
-        self.rating_var.set(rating_str)
+        if "EXIF:LensModel" in exif_info.keys():
+            self.lens_type_var.set(exif_info["EXIF:LensModel"])
+        else:
+            self.lens_type_var.set("Unknown")
+
+        if "EXIF:DateTimeOriginal" in exif_info.keys():
+            self.date_time_var.set(exif_info["EXIF:DateTimeOriginal"])
+        else:
+            self.date_time_var.set("Unknown")
+        
+        if "EXIF:FocalLength" in exif_info.keys():
+            self.focal_length_var.set(f"{exif_info["EXIF:FocalLength"]}mm")
+        else:
+            self.focal_length_var.set("Unknown")
+        
+        if "EXIF:ExposureTime" in exif_info.keys():
+            self.exposure_time_var.set(f"1/{1/exif_info["EXIF:ExposureTime"]}s")
+        else:
+            self.exposure_time_var.set("Unknown")
+        
+        if "EXIF:FNumber" in exif_info.keys():
+            self.aperture_var.set(f"F{exif_info["EXIF:FNumber"]}")
+        else:
+            self.aperture_var.set("Unknown")
+        
+        if "EXIF:ISO" in exif_info.keys():
+            self.iso_var.set(exif_info["EXIF:ISO"])
+        else:
+            self.iso_var.set("Unknown")
+        
+        if "XMP:Rating" in exif_info.keys():
+            rating = exif_info["XMP:Rating"]
+            rating_str = ""
+            for i in range(1, 6):
+                if i <= rating:
+                    rating_str += "★"
+                else:
+                    rating_str += "☆"
+            self.rating_var.set(rating_str)
+        else:
+            self.rating_var.set("Rating Unknown")
+        
 
 if __name__ == "__main__":
     from imageApp import ImageApp

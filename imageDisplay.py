@@ -21,6 +21,10 @@ class ImageDisplay:
         
         self.current_index_var = ctk.IntVar()
         
+        self.image_info = None
+        self.image_list = None
+        self.image_view = None
+        
         self.create_widgets()
 
     def next_image(self):
@@ -64,13 +68,16 @@ class ImageDisplay:
         self.image_view = ImageView(self.image_view_frame, self.images, self.current_index_var)
     
     def refresh_image_info(self):
-        self.image_info.update_exif_data()
+        if self.image_info != None:
+            self.image_info.update_exif_data()
     
     def refresh_image_list(self):
-        self.image_list.refresh_metadata()
+        if self.image_list != None:
+            self.image_list.refresh_metadata()
     
     def refresh_image_view(self):
-        self.image_view.create_widgets()
+        if self.image_view != None:
+            self.image_view.create_widgets()
     
     def refresh_new_image_selection(self):
         print("Refresh due to new image selection to " + str(self.current_index_var.get()))
@@ -79,10 +86,8 @@ class ImageDisplay:
     
     def create_control(self):
         self.button_path_selection = ctk.CTkButton(self.control_frame, text="Path Selection", command=self.changeToPathSelection)
-        self.button_path_selection.place(relx=0.4, rely=0.5, anchor="e")
-        # self.button_image_list = ctk.CTkButton(self.control_frame, text="Image List", command=self.changeToImageList)
-        # self.button_image_list.place(relx=0.6, rely=0.5, anchor="w")
-    
+        self.button_path_selection.place(relx=0.5, rely=0.5, anchor="center")
+
     def change_rating(self, rating: int):
         with ExifToolHelper() as et:
             et.set_tags(

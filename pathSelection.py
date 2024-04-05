@@ -33,7 +33,7 @@ class PathSelection:
         
     def on_select_folder(self) -> None:
         print("Selecting folder...")
-        folder = ctk.filedialog.askdirectory()
+        folder = ctk.filedialog.askdirectory(initialdir=self.folder_path_var.get())
         if not folder:
             return
         self.folder_path = folder
