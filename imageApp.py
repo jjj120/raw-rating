@@ -4,6 +4,8 @@ from util import load_images_from_folder
 from enum import Enum
 from pathSelection import PathSelection
 from imageDisplay import ImageDisplay
+from PIL import ImageTk
+import os
 
 class AppState(Enum):
     PATH_SELECTION = 1
@@ -12,10 +14,12 @@ class AppState(Enum):
 
 class ImageApp:
     def __init__(self, root: ctk.CTk, default_folder: str) -> None:
+        self.root = root
+        
         ctk.set_default_color_theme("dark-blue")
         ctk.set_appearance_mode("system")
+        self.root.iconphoto(False, ImageTk.PhotoImage(file=os.path.join(os.path.dirname(__file__), ".images/logo/icon.png")))
         
-        self.root = root
         self.root.minsize(500, 200)
         self.root.title("Image Viewer")
         self.state = AppState.PATH_SELECTION
