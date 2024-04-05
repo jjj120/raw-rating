@@ -81,3 +81,12 @@ class ImageView:
 
         self.photo_image = ImageTk.PhotoImage(img)
         self.image_id = self.canvas.create_image(width / 2, height / 2, anchor=ctk.CENTER, image=self.photo_image)
+
+if __name__ == "__main__":
+    from imageApp import ImageApp
+    
+    root = ctk.CTk()
+    root.title("Image Viewer")
+    app = ImageApp(root, "~/Pictures")
+    app.create_widgets()
+    root.mainloop()

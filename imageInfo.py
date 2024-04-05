@@ -135,3 +135,12 @@ class ImageInfo:
                 rating_str += "☆"
         
         self.rating_var.set(rating_str)
+
+if __name__ == "__main__":
+    from imageApp import ImageApp
+    
+    root = ctk.CTk()
+    root.title("Image Viewer")
+    app = ImageApp(root, "~/Pictures")
+    app.create_widgets()
+    root.mainloop()

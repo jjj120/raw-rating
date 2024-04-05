@@ -94,3 +94,12 @@ class ImageList:
             self.listbox._parent_canvas.yview_scroll(1, "units")
         else:
             self.listbox._parent_canvas.yview_scroll(-1, "units")
+
+if __name__ == "__main__":
+    from imageApp import ImageApp
+    
+    root = ctk.CTk()
+    root.title("Image Viewer")
+    app = ImageApp(root, "~/Pictures")
+    app.create_widgets()
+    root.mainloop()

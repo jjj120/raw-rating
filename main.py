@@ -2,13 +2,16 @@
 # -*- coding: utf-8 -*-
 
 import os
+from dotenv import dotenv_values
 from PIL import Image
 import customtkinter as ctk
 from imageApp import ImageApp
 from util import check_image_folder
 
 def main():
-    folder = '/mnt/daten/1 Fotos/2024/2024-04-01 Ostermontag'
+    dotenv = dotenv_values(".env")
+    
+    folder = dotenv.get("START_FOLDER")
     
     if check_image_folder(folder):
         root = ctk.CTk()

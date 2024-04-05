@@ -99,6 +99,6 @@ if __name__ == "__main__":
     
     root = ctk.CTk()
     root.title("Image Viewer")
-    app = ImageApp(root, "/mnt/daten/1 Fotos/2024/2024-04-01 Ostermontag")
+    app = ImageApp(root, "~/Pictures")
     app.create_widgets()
     root.mainloop()
