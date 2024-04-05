@@ -36,6 +36,7 @@ Image Display:
 - [exiftool](https://exiftool.org/)
 - [Pillow](https://pillow.readthedocs.io/en/stable/)
 - [Customtkinter](https://customtkinter.tomschimansky.com/)
+- [CTkListbox](https://github.com/Akascape/CTkListbox)
 
 ## License
 
