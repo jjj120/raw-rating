@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import Event
 from PIL import Image, ImageTk
 from util import rotate_image
+import gc
 
 SCALE_FACTOR = 1.2
 
@@ -64,6 +65,7 @@ class ImageView:
                     
     def create_widgets(self):
         self.canvas.delete(ctk.ALL)
+        gc.collect()
         self.canvas.pack(fill=ctk.BOTH, expand=True)
         self.canvas.focus_set()
 
@@ -73,14 +75,16 @@ class ImageView:
         width = self.root.winfo_width()
 
         img, img_path = self.images[self.curr_index_var.get()]
-        img = img.copy()
+        img_copied = img.copy()
 
-        img = rotate_image(img)
+        img_copied = rotate_image(img_copied)
         
-        img.thumbnail((width * self.scale, height * self.scale), Image.LANCZOS)
+        img_copied.thumbnail((width * self.scale, height * self.scale), Image.LANCZOS)
 
-        self.photo_image = ImageTk.PhotoImage(img)
+        self.photo_image = ImageTk.PhotoImage(img_copied)
+        self.photo_image.paste(img_copied)
         self.image_id = self.canvas.create_image(width / 2, height / 2, anchor=ctk.CENTER, image=self.photo_image)
+        gc.collect()
 
 if __name__ == "__main__":
     from imageApp import ImageApp
