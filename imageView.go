@@ -6,24 +6,23 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/gotk3/gotk3/cairo"
 	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/gtk"
 )
 
-const scaleFactor = 1.2
+const SCALE_FACTOR = 1.5
 
 type ImageView struct {
-	drawingArea            *gtk.DrawingArea
-	imagePath              string
-	pixbuf                 *gdk.Pixbuf
-	surface                *cairo.Surface
-	image                  image.Image
-	newImagePath           string
-	scale                  float64
-	dragStartX, dragStartY int
-	imgStartX, imgStartY   int
-	imgWidth, imgHeight    int
+	scrolledWindow               *gtk.ScrolledWindow
+	image                        *gtk.Image
+	pixbuf_orig                  *gdk.Pixbuf
+	imagePath                    string
+	newImagePath                 string
+	scale                        float64
+	dragStartX, dragStartY       float64
+	prevScrollX, prevScrollY     float64
+	hScrollbarVal, vScrollbarVal float64 // needed to get around the issue of scrolling to the top left corner on double click
+	imgOffsetX, imgOffsetY       int
 }
 
 func NewImageView() *ImageView {
@@ -31,124 +30,147 @@ func NewImageView() *ImageView {
 		scale: 1.0,
 	}
 
-	iv.drawingArea, err = gtk.DrawingAreaNew()
-	check_error("Unable to create drawing area", err)
+	iv.scrolledWindow, err = gtk.ScrolledWindowNew(nil, nil)
+	check_error("Unable to create scrolled window", err)
 
-	iv.drawingArea.SetSizeRequest(1920, 1080)
-	iv.drawingArea.AddEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON1_MOTION_MASK | gdk.SCROLL_MASK))
+	iv.image, err = gtk.ImageNew()
+	check_error("Unable to create image", err)
+	iv.image.SetCanFocus(false)
 
-	iv.drawingArea.Connect("draw", iv.draw)
-	iv.drawingArea.Connect("button-press-event", iv.onButtonPress)
-	iv.drawingArea.Connect("motion-notify-event", iv.onDrag)
-	iv.drawingArea.Connect("scroll-event", iv.onScroll)
+	iv.scrolledWindow.SetSizeRequest(1920, 1080)
+	iv.scrolledWindow.AddEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON1_MOTION_MASK | gdk.SCROLL_MASK))
+
+	// iv.scrolledWindow.SetOverlayScrolling(false)
+	iv.scrolledWindow.SetCaptureButtonPress(true)
+
+	iv.image.Connect("draw", iv.draw)
+	iv.scrolledWindow.Connect("button-press-event", iv.onButtonPress)
+	iv.scrolledWindow.Connect("motion-notify-event", iv.onDrag)
+	iv.scrolledWindow.Connect("scroll-event", iv.onScroll)
+
+	iv.scrolledWindow.Add(iv.image)
 
 	return iv
 }
 
-func (iv *ImageView) draw(da *gtk.DrawingArea, cr *cairo.Context) {
-	// , cr *cairo.Context
-	if da == nil {
-		panic("Drawing area is nil")
-	}
-	if cr == nil {
-		panic("Cairo context is nil")
-	}
-	if iv == nil {
-		panic("ImageView is nil")
-	}
+func (iv *ImageView) draw(img *gtk.Image) {
+	scrollWidth := iv.scrolledWindow.GetAllocatedWidth()
+	scrollHeight := iv.scrolledWindow.GetAllocatedHeight()
 
 	if iv.imagePath != iv.newImagePath {
 		// load image
-		iv.pixbuf, err = gdk.PixbufNewFromFile(imageView.newImagePath)
-		check_error("Unable to load image", err)
-		iv.imgWidth = iv.pixbuf.GetWidth()
-		iv.imgHeight = iv.pixbuf.GetHeight()
+		img.SetFromFile(iv.newImagePath)
 
-		drawAreaWidth := iv.drawingArea.GetAllocatedWidth()
-		drawAreaHeight := iv.drawingArea.GetAllocatedHeight()
+		iv.pixbuf_orig = nil
+		iv.pixbuf_orig = img.GetPixbuf()
 
 		// Reset values
 		iv.imagePath = iv.newImagePath
-		iv.scale = min(float64(drawAreaWidth)/float64(iv.imgWidth), float64(drawAreaHeight)/float64(iv.imgHeight))
+		iv.scale = 1
 		iv.dragStartX = 0
 		iv.dragStartY = 0
-		iv.imgStartX = 0
-		iv.imgStartY = 0
 	}
 
-	cr.Scale(iv.scale, iv.scale)
-	// cr.Translate(float64(iv.imgStartX-iv.imgStartXCurr), float64(iv.imgStartY-iv.imgStartYCurr))
+	// fmt.Println("Drawing image with scale: ", iv.scale)
 
-	// draw image
-	window, err := da.GetWindow()
-	check_error("Unable to get window from drawing area", err)
-	// iv.surface = nil
-	// iv.surface.Close()
+	imageRatio := float64(iv.pixbuf_orig.GetWidth()) / float64(iv.pixbuf_orig.GetHeight())
 
-	iv.pixbuf, err = gdk.PixbufNewFromFile(imageView.newImagePath)
-	check_error("Unable to load image", err)
+	newHeight := int(float64(scrollHeight) * iv.scale)
+	newWidthFromHeight := int(float64(newHeight) * imageRatio)
 
-	iv.surface, err = gdk.CairoSurfaceCreateFromPixbuf(iv.pixbuf, 1, window)
-	check_error("Unable to create surface from pixbuf", err)
+	newWidth := int(float64(scrollWidth) * iv.scale)
+	newHeightFromWidth := int(float64(newWidth) / imageRatio)
 
-	cr.SetSourceSurface(iv.surface, float64(iv.imgStartX), float64(iv.imgStartY))
-	cr.Paint()
+	if newHeight <= scrollHeight && newWidthFromHeight <= scrollWidth {
+		newWidth = newWidthFromHeight
+	} else {
+		newHeight = newHeightFromWidth
+	}
+
+	iv.imgOffsetX = (newWidth - scrollWidth) / 2
+	iv.imgOffsetY = (newHeight - scrollHeight) / 2
+
+	pixbuf, err := iv.pixbuf_orig.ScaleSimple(newWidth, newHeight, gdk.INTERP_BILINEAR)
+	check_error("Unable to scale pixbuf", err)
+
+	img.SetFromPixbuf(pixbuf)
+
+	fmt.Println("Setting scrollbar values to: ", iv.hScrollbarVal, iv.vScrollbarVal)
+
+	iv.scrolledWindow.GetHAdjustment().SetValue(iv.hScrollbarVal)
+	iv.scrolledWindow.GetVAdjustment().SetValue(iv.vScrollbarVal)
+
+	// fmt.Println(iv.image.GetAllocatedWidth(), iv.image.GetAllocatedHeight(), int(float64(scrollWidth)*iv.scale), int(float64(scrollHeight)*iv.scale), pixbuf.GetWidth(), pixbuf.GetHeight())
 }
 
-func (iv *ImageView) onScroll(da *gtk.DrawingArea, event *gdk.Event) {
+func (iv *ImageView) onScroll(sw *gtk.ScrolledWindow, event *gdk.Event) {
 	scrollEvent := gdk.EventScrollNewFromEvent(event)
 	direction := scrollEvent.Direction()
-	x, y := scrollEvent.X(), scrollEvent.Y()
-	deltaX, deltaY := 0, 0
 
-	if direction == gdk.SCROLL_UP {
-		iv.scale *= scaleFactor
-		deltaX = int(x * (1 - scaleFactor))
-		deltaY = int(y * (1 - scaleFactor))
-
-	} else if direction == gdk.SCROLL_DOWN {
-		iv.scale /= scaleFactor
-		deltaX = int(x * (1 - 1/scaleFactor))
-		deltaY = int(y * (1 - 1/scaleFactor))
+	// zoom if ctrl is pressed
+	if scrollEvent.State()&gdk.CONTROL_MASK == 0 {
+		return
 	}
-	iv.imgStartX = iv.imgStartX + deltaX
-	iv.imgStartY = iv.imgStartY + deltaY
 
-	// fmt.Println("Scrolling to scale: ", iv.scale)
-	iv.drawingArea.QueueDraw()
+	scaleBefore := iv.scale
+	x, y := scrollEvent.X(), scrollEvent.Y()
+
+	fmt.Println(x, y)
+
+	hScrollbarValueBefore := sw.GetHScrollbar().GetValue()
+	vScrollbarValueBefore := sw.GetVScrollbar().GetValue()
+
+	switch direction {
+	case gdk.SCROLL_UP:
+		iv.scale *= SCALE_FACTOR
+	case gdk.SCROLL_DOWN:
+		iv.scale /= SCALE_FACTOR
+	case gdk.SCROLL_SMOOTH:
+		iv.scale -= scrollEvent.DeltaY() / 100 * SCALE_FACTOR
+	}
+
+	fmt.Println("Scrolling to scale: ", iv.scale, scrollEvent.DeltaY())
+
+	iv.hScrollbarVal = (float64(x)+hScrollbarValueBefore)*(iv.scale/scaleBefore) - float64(x)
+	iv.vScrollbarVal = (float64(y)+vScrollbarValueBefore)*(iv.scale/scaleBefore) - float64(y) - scrollEvent.DeltaY()*sw.GetVScrollbar().GetAdjustment().GetMinimumIncrement()/5
+
+	iv.image.QueueDraw()
 }
 
-func (iv *ImageView) onButtonPress(da *gtk.DrawingArea, event *gdk.Event) {
+func (iv *ImageView) onButtonPress(sw *gtk.ScrolledWindow, event *gdk.Event) {
 	// fmt.Println("Button Pressed")
 	buttonEvent := gdk.EventButtonNewFromEvent(event)
-	if buttonEvent.Type() == gdk.EVENT_2BUTTON_PRESS {
-		// reset scaling and position
-		drawAreaWidth := iv.drawingArea.GetAllocatedWidth()
-		drawAreaHeight := iv.drawingArea.GetAllocatedHeight()
-		iv.scale = min(float64(drawAreaWidth)/float64(iv.imgWidth), float64(drawAreaHeight)/float64(iv.imgHeight))
-		iv.imgStartX = 0.0
-		iv.imgStartY = 0.0
-		iv.drawingArea.QueueDraw()
+	// if buttonEvent.Type() == gdk.EVENT_2BUTTON_PRESS {
+	if buttonEvent.Button() == gdk.BUTTON_SECONDARY {
+		// reset scaling
+		if iv.scale != 1.0 {
+			iv.scale = 1.0
+		} else {
+			iv.scale = 3.0
+
+			iv.hScrollbarVal = (buttonEvent.X()/float64(sw.GetAllocatedWidth())*(sw.GetHAdjustment().GetUpper()-sw.GetHAdjustment().GetLower()) + sw.GetHAdjustment().GetLower()) * 2
+			iv.vScrollbarVal = (buttonEvent.Y()/float64(sw.GetAllocatedHeight())*(sw.GetVAdjustment().GetUpper()-sw.GetVAdjustment().GetLower()) + sw.GetVAdjustment().GetLower()) * 2
+		}
+		iv.image.QueueDraw()
 
 	} else if buttonEvent.Button() == gdk.BUTTON_PRIMARY {
-		iv.dragStartX = int(buttonEvent.X())
-		iv.dragStartY = int(buttonEvent.Y())
+		iv.dragStartX = buttonEvent.X()
+		iv.dragStartY = buttonEvent.Y()
+		iv.prevScrollX = sw.GetHScrollbar().GetValue()
+		iv.prevScrollY = sw.GetVScrollbar().GetValue()
 	}
 }
 
-func (iv *ImageView) onDrag(da *gtk.DrawingArea, event *gdk.Event) {
+func (iv *ImageView) onDrag(sw *gtk.ScrolledWindow, event *gdk.Event) {
 	motionEvent := gdk.EventMotionNewFromEvent(event)
-	x, y := motionEvent.MotionVal()
-	// fmt.Println("Dragging with motion values", x, y, "and start values", iv.dragStartX, iv.dragStartY)
-	deltaX := int(x) - iv.dragStartX
-	deltaY := int(y) - iv.dragStartY
-	iv.dragStartX = int(x)
-	iv.dragStartY = int(y)
+	if motionEvent.State()&gdk.BUTTON1_MASK != 0 {
+		x, y := motionEvent.MotionVal()
+		deltaX := x - iv.dragStartX
+		deltaY := y - iv.dragStartY
 
-	iv.imgStartX += deltaX
-	iv.imgStartY += deltaY
-
-	iv.drawingArea.QueueDraw()
+		iv.hScrollbarVal = iv.prevScrollX - float64(deltaX)
+		iv.vScrollbarVal = iv.prevScrollY - float64(deltaY)
+	}
 }
 
 func rotateImage(img image.Image) image.Image {
@@ -190,5 +212,5 @@ func setupImageView() *ImageView {
 func refreshImageView() {
 	imageView.newImagePath = imageRawToDispMap[currRAWImagePath]
 	fmt.Println("Refreshing image view with new image path: ", imageView.newImagePath, "from raw path: ", currRAWImagePath)
-	imageView.drawingArea.QueueDraw()
+	imageView.image.QueueDraw()
 }

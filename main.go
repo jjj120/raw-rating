@@ -124,11 +124,11 @@ func setupWindow(application *gtk.Application) *gtk.ApplicationWindow {
 	vBox.PackStart(listView, true, true, 10)
 
 	// Create the right element
-	imageView.drawingArea.SetHExpand(true)
+	imageView.scrolledWindow.SetHExpand(true)
 
 	// Add the vertical box and the right label to the horizontal box
 	box.PackStart(vBox, false, false, 10)
-	box.PackStart(imageView.drawingArea, true, true, 10)
+	box.PackStart(imageView.scrolledWindow, true, true, 10)
 
 	// Connect to key presses
 	win.Connect("key-press-event", keyPress)
@@ -243,6 +243,9 @@ func keyPress(win *gtk.ApplicationWindow, event *gdk.Event) {
 
 	switch keyVal {
 	case gdk.KEY_Escape:
+		win.Close()
+
+	case gdk.KEY_q:
 		win.Close()
 
 	case gdk.KEY_0:
