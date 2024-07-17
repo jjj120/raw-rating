@@ -20,6 +20,8 @@ var RAW_SUFFIXES = []string{"cr3", "cr2", "dng", "360", "3fr", "3g2", "3gp", "3g
 
 var DISPLAY_SUFFIXES = []string{"jpg", "jpeg", "png"}
 
+const DEFAULT_PATH = "~/Pictures"
+
 var (
 	et                *exiftool.Exiftool
 	imageDirectory    string
@@ -45,9 +47,9 @@ func main() {
 	check_error("Could not load dotenv", err)
 
 	imageDirectory = os.Getenv("START_FOLDER")
-
-	currRAWImagePath = "test_images/IMG_0371.CR3"
-	imageDirectory = "test_images"
+	if imageDirectory == "" {
+		imageDirectory = DEFAULT_PATH
+	}
 
 	et, err = exiftool.NewExiftool()
 	if err != nil {
