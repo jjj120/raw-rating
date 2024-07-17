@@ -10,31 +10,88 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 )
 
-func setupListView() *gtk.ListBox {
-	listBox, err := gtk.ListBoxNew()
-	check_error("Unable to create list box", err)
-
-	if imageDirectory == "" {
-		return listBox
-	}
-
-	listBox.SetActivateOnSingleClick(true)
-
-	return listBox
+type ListView struct {
+	listBox        *gtk.ListBox
+	scrolledWindow *gtk.ScrolledWindow
 }
 
-func addListEntry(rawFilename string, dispFilename string, listBox *gtk.ListBox) {
+func NewListView() *ListView {
+	listView := &ListView{}
+
+	listView.listBox, err = gtk.ListBoxNew()
+	check_error("Unable to create list box", err)
+
+	listView.scrolledWindow, err = gtk.ScrolledWindowNew(nil, nil)
+	check_error("Unable to create scrolled window", err)
+
+	listView.scrolledWindow.Add(listView.listBox)
+
+	return listView
+}
+
+func (lv *ListView) addListEntry(rawFilename string, dispFilename string) {
 	rawFilenameStripped := strings.Split(rawFilename, "/")[len(strings.Split(rawFilename, "/"))-1]
+
 	label, err := gtk.LabelNew(rawFilenameStripped)
 	label.SetXAlign(0)
 	label.SetMarginStart(LABEL_MARGIN)
 	check_error("Unable to create label for listbox row", err)
 
+	// pixbuf, err := gdk.PixbufNewFromFile(imageRawToDispMap[rawFilename])
+	// check_error("Unable to create pixbuf from file", err)
+
+	// pixbuf, err = pixbuf.ScaleSimple(100, 100, gdk.INTERP_BILINEAR)
+	// check_error("Unable to scale pixbuf", err)
+
+	// pixbuf = rotatePixbuf(imageRawToDispMap[rawFilename], pixbuf)
+
+	// image, err := gtk.ImageNewFromPixbuf(pixbuf)
+	// check_error("Unable to create image from pixbuf", err)
+	// image.SetMarginStart(LABEL_MARGIN)
+
 	row, err := gtk.ListBoxRowNew()
 	check_error("Unable to create listbox row", err)
 
+	// rowBox, err := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
+	// check_error("Unable to create box for listbox row", err)
+
+	// rowBox.Add(label)
+	// rowBox.Add(image)
 	row.Add(label)
-	listBox.Add(row)
+	lv.listBox.Add(row)
+}
+
+func (lv *ListView) refreshListView() {
+	lv.clearListBox()
+
+	imageRawToDispMap = getImageMapping(imageDirectory)
+
+	for rawFilename, dispFilename := range imageRawToDispMap {
+		lv.addListEntry(rawFilename, dispFilename)
+		// fmt.Println("Added ", rawFilename, "to list with display filename", dispFilename)
+	}
+
+	lv.listBox.SetSortFunc(func(row1, row2 *gtk.ListBoxRow) int {
+		return strings.Compare(getLabelTextFromRow(row1), getLabelTextFromRow(row2))
+	})
+}
+
+func (lv *ListView) clearListBox() {
+	for {
+		row := lv.listBox.GetRowAtIndex(0)
+		if row == nil {
+			break
+		}
+		row.Destroy()
+	}
+}
+
+func refreshListView() {
+	listView.refreshListView()
+}
+
+func setupListView() *ListView {
+	return NewListView()
 }
 
 func getImageMapping(dirName string) map[string]string {
@@ -79,9 +136,6 @@ func getImageMapping(dirName string) map[string]string {
 		}
 	}
 
-	fmt.Println(rawFileList)
-	fmt.Println(displayFileList)
-
 	// TODO: make this more performant, this is ugly haha
 	fileList := map[string]string{}
 	for _, filenameRAW := range rawFileList {
@@ -96,32 +150,8 @@ func getImageMapping(dirName string) map[string]string {
 		}
 	}
 
-	fmt.Println(fileList)
+	// fmt.Println(fileList)
 	return fileList
-}
-
-func refreshListView() {
-	clearListBox(listView)
-	fmt.Println("refresh list view")
-
-	imageRawToDispMap = getImageMapping(imageDirectory)
-	fmt.Println("refresh list view")
-
-	fmt.Println(imageRawToDispMap)
-
-	for rawFilename, dispFilename := range imageRawToDispMap {
-		addListEntry(rawFilename, dispFilename, listView)
-		fmt.Println("Added ", rawFilename, "to list with display filename", dispFilename)
-	}
-
-	listView.SetSortFunc(func(row1, row2 *gtk.ListBoxRow) int {
-		return strings.Compare(getLabelTextFromRow(row1), getLabelTextFromRow(row2))
-	})
-
-}
-
-func clearListBox(listBox *gtk.ListBox) {
-	listView = setupListView()
 }
 
 func getLabelTextFromRow(row *gtk.ListBoxRow) string {

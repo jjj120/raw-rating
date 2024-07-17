@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"image"
-	"os"
-	"runtime"
 
+	"github.com/barasher/go-exiftool"
 	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/gtk"
 )
@@ -13,196 +11,189 @@ import (
 const SCALE_FACTOR = 1.5
 
 type ImageView struct {
-	scrolledWindow               *gtk.ScrolledWindow
-	image                        *gtk.Image
-	pixbuf_orig                  *gdk.Pixbuf
-	imagePath                    string
-	newImagePath                 string
-	scale                        float64
-	dragStartX, dragStartY       float64
-	prevScrollX, prevScrollY     float64
-	hScrollbarVal, vScrollbarVal float64 // needed to get around the issue of scrolling to the top left corner on double click
-	imgOffsetX, imgOffsetY       int
+	box, boxLeft, boxRight *gtk.Box
+	scrolledWindow         *gtk.ScrolledWindow
+	zoomView               *ZoomView
+	image                  *gtk.Image
+	pixbuf_orig            *gdk.Pixbuf
+	imagePath              string
+	newImagePath           string
+	currHeight, currWidth  int
+	xOffset, yOffset       float64
 }
 
 func NewImageView() *ImageView {
-	iv := &ImageView{
-		scale: 1.0,
-	}
+	iv := &ImageView{}
+
+	iv.box, err = gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 10)
+	check_error("Unable to create scrolled window", err)
+
+	iv.zoomView = NewZoomView()
+
+	iv.boxLeft, err = gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	check_error("Unable to create box", err)
+	iv.boxLeft.SetHExpand(true)
+
+	iv.boxRight, err = gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	check_error("Unable to create box", err)
 
 	iv.scrolledWindow, err = gtk.ScrolledWindowNew(nil, nil)
-	check_error("Unable to create scrolled window", err)
+	check_error("Unable to create ScrolledWindow", err)
+	iv.scrolledWindow.SetHExpand(true)
+	iv.scrolledWindow.SetVExpand(true)
 
 	iv.image, err = gtk.ImageNew()
 	check_error("Unable to create image", err)
 	iv.image.SetCanFocus(false)
 
-	iv.scrolledWindow.SetSizeRequest(1920, 1080)
+	iv.box.SetSizeRequest(1920, 1080)
 	iv.scrolledWindow.AddEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON1_MOTION_MASK | gdk.SCROLL_MASK))
-
-	// iv.scrolledWindow.SetOverlayScrolling(false)
-	iv.scrolledWindow.SetCaptureButtonPress(true)
+	// iv.boxLeft.AddEvents(int(gdk.BUTTON_PRESS_MASK))
 
 	iv.image.Connect("draw", iv.draw)
 	iv.scrolledWindow.Connect("button-press-event", iv.onButtonPress)
 	iv.scrolledWindow.Connect("motion-notify-event", iv.onDrag)
-	iv.scrolledWindow.Connect("scroll-event", iv.onScroll)
 
 	iv.scrolledWindow.Add(iv.image)
+	iv.boxLeft.Add(iv.scrolledWindow)
+	// iv.boxLeft.Add(iv.image)
+	iv.boxRight.Add(iv.zoomView.box)
+
+	iv.box.PackStart(iv.boxLeft, true, true, 10)
+	iv.box.PackStart(iv.boxRight, true, true, 10)
 
 	return iv
 }
 
 func (iv *ImageView) draw(img *gtk.Image) {
-	scrollWidth := iv.scrolledWindow.GetAllocatedWidth()
-	scrollHeight := iv.scrolledWindow.GetAllocatedHeight()
+	boxHeight := iv.boxLeft.GetAllocatedHeight()
+	boxWidth := iv.boxLeft.GetAllocatedWidth()
 
-	if iv.imagePath != iv.newImagePath {
+	if (iv.imagePath != iv.newImagePath) || (iv.currHeight != boxHeight) || (iv.currWidth != boxWidth) {
 		// load image
 		img.SetFromFile(iv.newImagePath)
 
 		iv.pixbuf_orig = nil
 		iv.pixbuf_orig = img.GetPixbuf()
 
+		// Rotate image if needed (based on EXIF data)
+		iv.pixbuf_orig = rotatePixbuf(iv.newImagePath, iv.pixbuf_orig)
+
+		iv.zoomView.pixbuf_orig = iv.pixbuf_orig
+
 		// Reset values
 		iv.imagePath = iv.newImagePath
-		iv.scale = 1
-		iv.dragStartX = 0
-		iv.dragStartY = 0
+
+		imageRatio := float64(iv.pixbuf_orig.GetWidth()) / float64(iv.pixbuf_orig.GetHeight())
+
+		newHeight := boxHeight
+		newWidthFromHeight := int(float64(newHeight) * imageRatio)
+
+		newWidth := boxWidth
+		newHeightFromWidth := int(float64(newWidth) / imageRatio)
+
+		if newHeight <= boxHeight && newWidthFromHeight <= boxWidth {
+			newWidth = newWidthFromHeight
+		} else {
+			newHeight = newHeightFromWidth
+		}
+
+		pixbuf, err := iv.pixbuf_orig.ScaleSimple(newWidth, newHeight, gdk.INTERP_BILINEAR)
+		check_error("Unable to scale pixbuf", err)
+
+		img.SetFromPixbuf(pixbuf)
+
+		iv.xOffset = float64(boxWidth-newWidth) / 2
+		iv.yOffset = float64(boxHeight-newHeight) / 2
+
+		iv.zoomView.zoomVal = float64(iv.pixbuf_orig.GetWidth()) / float64(newWidth)
+		iv.zoomView.zoomVal = float64(iv.pixbuf_orig.GetHeight()) / float64(newHeight)
+
+		iv.zoomView.QueueDraw()
 	}
-
-	// fmt.Println("Drawing image with scale: ", iv.scale)
-
-	imageRatio := float64(iv.pixbuf_orig.GetWidth()) / float64(iv.pixbuf_orig.GetHeight())
-
-	newHeight := int(float64(scrollHeight) * iv.scale)
-	newWidthFromHeight := int(float64(newHeight) * imageRatio)
-
-	newWidth := int(float64(scrollWidth) * iv.scale)
-	newHeightFromWidth := int(float64(newWidth) / imageRatio)
-
-	if newHeight <= scrollHeight && newWidthFromHeight <= scrollWidth {
-		newWidth = newWidthFromHeight
-	} else {
-		newHeight = newHeightFromWidth
-	}
-
-	iv.imgOffsetX = (newWidth - scrollWidth) / 2
-	iv.imgOffsetY = (newHeight - scrollHeight) / 2
-
-	pixbuf, err := iv.pixbuf_orig.ScaleSimple(newWidth, newHeight, gdk.INTERP_BILINEAR)
-	check_error("Unable to scale pixbuf", err)
-
-	img.SetFromPixbuf(pixbuf)
-
-	fmt.Println("Setting scrollbar values to: ", iv.hScrollbarVal, iv.vScrollbarVal)
-
-	iv.scrolledWindow.GetHAdjustment().SetValue(iv.hScrollbarVal)
-	iv.scrolledWindow.GetVAdjustment().SetValue(iv.vScrollbarVal)
-
-	// fmt.Println(iv.image.GetAllocatedWidth(), iv.image.GetAllocatedHeight(), int(float64(scrollWidth)*iv.scale), int(float64(scrollHeight)*iv.scale), pixbuf.GetWidth(), pixbuf.GetHeight())
-}
-
-func (iv *ImageView) onScroll(sw *gtk.ScrolledWindow, event *gdk.Event) {
-	scrollEvent := gdk.EventScrollNewFromEvent(event)
-	direction := scrollEvent.Direction()
-
-	// zoom if ctrl is pressed
-	if scrollEvent.State()&gdk.CONTROL_MASK == 0 {
-		return
-	}
-
-	scaleBefore := iv.scale
-	x, y := scrollEvent.X(), scrollEvent.Y()
-
-	fmt.Println(x, y)
-
-	hScrollbarValueBefore := sw.GetHScrollbar().GetValue()
-	vScrollbarValueBefore := sw.GetVScrollbar().GetValue()
-
-	switch direction {
-	case gdk.SCROLL_UP:
-		iv.scale *= SCALE_FACTOR
-	case gdk.SCROLL_DOWN:
-		iv.scale /= SCALE_FACTOR
-	case gdk.SCROLL_SMOOTH:
-		iv.scale -= scrollEvent.DeltaY() / 100 * SCALE_FACTOR
-	}
-
-	fmt.Println("Scrolling to scale: ", iv.scale, scrollEvent.DeltaY())
-
-	iv.hScrollbarVal = (float64(x)+hScrollbarValueBefore)*(iv.scale/scaleBefore) - float64(x)
-	iv.vScrollbarVal = (float64(y)+vScrollbarValueBefore)*(iv.scale/scaleBefore) - float64(y) - scrollEvent.DeltaY()*sw.GetVScrollbar().GetAdjustment().GetMinimumIncrement()/5
-
-	iv.image.QueueDraw()
+	iv.currHeight = boxHeight
+	iv.currWidth = boxWidth
 }
 
 func (iv *ImageView) onButtonPress(sw *gtk.ScrolledWindow, event *gdk.Event) {
 	// fmt.Println("Button Pressed")
 	buttonEvent := gdk.EventButtonNewFromEvent(event)
-	// if buttonEvent.Type() == gdk.EVENT_2BUTTON_PRESS {
-	if buttonEvent.Button() == gdk.BUTTON_SECONDARY {
-		// reset scaling
-		if iv.scale != 1.0 {
-			iv.scale = 1.0
-		} else {
-			iv.scale = 3.0
 
-			iv.hScrollbarVal = (buttonEvent.X()/float64(sw.GetAllocatedWidth())*(sw.GetHAdjustment().GetUpper()-sw.GetHAdjustment().GetLower()) + sw.GetHAdjustment().GetLower()) * 2
-			iv.vScrollbarVal = (buttonEvent.Y()/float64(sw.GetAllocatedHeight())*(sw.GetVAdjustment().GetUpper()-sw.GetVAdjustment().GetLower()) + sw.GetVAdjustment().GetLower()) * 2
-		}
-		iv.image.QueueDraw()
-
-	} else if buttonEvent.Button() == gdk.BUTTON_PRIMARY {
-		iv.dragStartX = buttonEvent.X()
-		iv.dragStartY = buttonEvent.Y()
-		iv.prevScrollX = sw.GetHScrollbar().GetValue()
-		iv.prevScrollY = sw.GetVScrollbar().GetValue()
+	if buttonEvent.Button() == gdk.BUTTON_PRIMARY {
+		x, y := buttonEvent.MotionVal()
+		iv.zoomView.valPosX, iv.zoomView.valPosY = (x-iv.xOffset)/(float64(iv.boxLeft.GetAllocatedWidth())-2*iv.xOffset), (y-iv.yOffset)/(float64(iv.boxLeft.GetAllocatedHeight())-2*iv.yOffset)
+		iv.zoomView.QueueDraw()
 	}
 }
 
 func (iv *ImageView) onDrag(sw *gtk.ScrolledWindow, event *gdk.Event) {
-	motionEvent := gdk.EventMotionNewFromEvent(event)
-	if motionEvent.State()&gdk.BUTTON1_MASK != 0 {
-		x, y := motionEvent.MotionVal()
-		deltaX := x - iv.dragStartX
-		deltaY := y - iv.dragStartY
-
-		iv.hScrollbarVal = iv.prevScrollX - float64(deltaX)
-		iv.vScrollbarVal = iv.prevScrollY - float64(deltaY)
+	// fmt.Println("Dragging")
+	dragEvent := gdk.EventMotionNewFromEvent(event)
+	if dragEvent.State()&gdk.BUTTON1_MASK != 0 {
+		x, y := dragEvent.MotionVal()
+		iv.zoomView.valPosX, iv.zoomView.valPosY = (x-iv.xOffset)/(float64(iv.boxLeft.GetAllocatedWidth())-2*iv.xOffset), (y-iv.yOffset)/(float64(iv.boxLeft.GetAllocatedHeight())-2*iv.yOffset)
+		iv.zoomView.QueueDraw()
 	}
 }
 
-func rotateImage(img image.Image) image.Image {
+func rotatePixbuf(filepath string, pixbuf *gdk.Pixbuf) *gdk.Pixbuf {
 	// Implement rotation logic here if needed
-	return img
-}
+	metadata := et.ExtractMetadata(filepath)
 
-func resizeImage(img image.Image, width, height int) image.Image {
-	// Implement resize logic here
-	return img
-}
+	rot, err := metadata[0].GetString("Orientation")
+	if err == exiftool.ErrKeyNotFound {
+		fmt.Println("No orientation found. Defaulting to Horizontal (normal)")
+		rot = "Horizontal (normal)"
+		err = nil
+	}
 
-func main_old() {
-	runtime.LockOSThread()
-	gtk.Init(nil)
+	// 1 = Horizontal (normal)
+	// 2 = Mirror horizontal
+	// 3 = Rotate 180
+	// 4 = Mirror vertical
+	// 5 = Mirror horizontal and rotate 270 CW
+	// 6 = Rotate 90 CW
+	// 7 = Mirror horizontal and rotate 90 CW
+	// 8 = Rotate 270 CW
 
-	window, _ := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
-	window.SetTitle("Image Viewer")
-	window.SetDefaultSize(1920, 1080)
-	window.Connect("destroy", func() {
-		gtk.MainQuit()
-	})
+	switch rot {
+	case "Horizontal (normal)":
+		// Do nothing
 
-	// Load images here
-	var images []image.Image
-	imgFile, _ := os.Open("image.png") // Use actual file paths
-	img, _, _ := image.Decode(imgFile)
-	images = append(images, img)
+	case "Mirror horizontal":
+		pixbuf, err = pixbuf.Flip(true)
+		check_error("Unable to flip pixbuf", err)
 
-	NewImageView()
+	case "Rotate 180":
+		pixbuf, err = pixbuf.RotateSimple(gdk.PIXBUF_ROTATE_UPSIDEDOWN)
+		check_error("Unable to rotate pixbuf", err)
 
-	gtk.Main()
+	case "Mirror vertical":
+		pixbuf, err = pixbuf.Flip(false)
+		check_error("Unable to flip pixbuf", err)
+
+	case "Mirror horizontal and rotate 270 CW":
+		pixbuf, err = pixbuf.RotateSimple(gdk.PIXBUF_ROTATE_CLOCKWISE)
+		check_error("Unable to rotate pixbuf", err)
+		pixbuf, err = pixbuf.Flip(true)
+		check_error("Unable to flip pixbuf", err)
+
+	case "Rotate 90 CW":
+		pixbuf, err = pixbuf.RotateSimple(gdk.PIXBUF_ROTATE_CLOCKWISE)
+		check_error("Unable to rotate pixbuf", err)
+
+	case "Mirror horizontal and rotate 90 CW":
+		pixbuf, err = pixbuf.RotateSimple(gdk.PIXBUF_ROTATE_COUNTERCLOCKWISE)
+		check_error("Unable to rotate pixbuf", err)
+		pixbuf, err = pixbuf.Flip(true)
+		check_error("Unable to flip pixbuf", err)
+
+	case "Rotate 270 CW":
+		pixbuf, err = pixbuf.RotateSimple(gdk.PIXBUF_ROTATE_COUNTERCLOCKWISE)
+		check_error("Unable to rotate pixbuf", err)
+	}
+
+	return pixbuf
 }
 
 func setupImageView() *ImageView {
@@ -211,6 +202,6 @@ func setupImageView() *ImageView {
 
 func refreshImageView() {
 	imageView.newImagePath = imageRawToDispMap[currRAWImagePath]
-	fmt.Println("Refreshing image view with new image path: ", imageView.newImagePath, "from raw path: ", currRAWImagePath)
+	// fmt.Println("Refreshing image view with new image path: ", imageView.newImagePath, "from raw path: ", currRAWImagePath)
 	imageView.image.QueueDraw()
 }

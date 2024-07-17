@@ -27,7 +27,7 @@ var (
 	application       *gtk.Application
 	win               *gtk.ApplicationWindow
 	box               *gtk.Box
-	listView          *gtk.ListBox
+	listView          *ListView
 	infoViewFrame     *gtk.Frame
 	infoView          *InfoView
 	imageView         *ImageView
@@ -95,7 +95,7 @@ func setupWindow(application *gtk.Application) *gtk.ApplicationWindow {
 	imageView = setupImageView()
 	refreshImageView()
 
-	listView.Connect("row-selected", func(box *gtk.ListBox, row *gtk.ListBoxRow) {
+	listView.listBox.Connect("row-selected", func(box *gtk.ListBox, row *gtk.ListBoxRow) {
 		if row != nil {
 			// Call the function to get the label text from the selected row
 			text := getLabelTextFromRow(row)
@@ -104,8 +104,8 @@ func setupWindow(application *gtk.Application) *gtk.ApplicationWindow {
 			refreshImageChanged()
 		} else {
 			// clear all data of the application
-			println("resetup application because of none selection")
-			setupWindow(application)
+			// println("resetup application because of none selection")
+			// setupWindow(application)
 		}
 	})
 
@@ -121,14 +121,11 @@ func setupWindow(application *gtk.Application) *gtk.ApplicationWindow {
 	vBox.PackStart(infoViewFrame, false, false, 10)
 
 	// Add the bottom-left element
-	vBox.PackStart(listView, true, true, 10)
-
-	// Create the right element
-	imageView.scrolledWindow.SetHExpand(true)
+	vBox.PackStart(listView.scrolledWindow, true, true, 10)
 
 	// Add the vertical box and the right label to the horizontal box
 	box.PackStart(vBox, false, false, 10)
-	box.PackStart(imageView.scrolledWindow, true, true, 10)
+	box.PackStart(imageView.box, true, true, 10)
 
 	// Connect to key presses
 	win.Connect("key-press-event", keyPress)
@@ -244,30 +241,22 @@ func keyPress(win *gtk.ApplicationWindow, event *gdk.Event) {
 	switch keyVal {
 	case gdk.KEY_Escape:
 		win.Close()
-
 	case gdk.KEY_q:
 		win.Close()
-
 	case gdk.KEY_0:
 		changeRating(0)
-
 	case gdk.KEY_1:
 		changeRating(1)
-
 	case gdk.KEY_2:
 		changeRating(2)
-
 	case gdk.KEY_3:
 		changeRating(3)
-
 	case gdk.KEY_4:
 		changeRating(4)
-
 	case gdk.KEY_5:
 		changeRating(5)
-
 	}
-
+	win.ShowAll()
 }
 
 func changeRating(rating int) {
@@ -283,5 +272,4 @@ func changeRating(rating int) {
 	et.WriteMetadata(dispArgs)
 
 	refreshInfoView()
-
 }
