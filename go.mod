@@ -1,4 +1,4 @@
-module github.com/jjj120/cr3-rating
+module github.com/jjj120/raw-rating
 
 go 1.22.4
 

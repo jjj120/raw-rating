@@ -1,12 +1,12 @@
-# CR3 Rating tool
+# RAW Rating tool
 
 ## Description
 
-This is a tool to rate CR3 files (Canon RAW 3) and write these ratings directly to the exif data of the CR3 and JPG file. It is useful for photographers who want to rate their images before importing them into a photo management software (Lightroom, Darktable, etc.).
+This is a tool to rate RAW image files and write these ratings directly to the exif data of the RAW and JPG file. It is useful for photographers who want to rate their images before importing them into a photo management software (Lightroom, Darktable, etc.).
 
-The tool displays the image and allows the user to rate it with a number from 0 to 5. The rating is written to the exif data of the CR3 and JPG file. The tool is written in Go and uses the gotk3 library for the GTK3 based GUI. The tool is still in development and has some bugs and performance issues. (See TODO section for more information)
+The tool displays the image and allows the user to rate it with a number from 0 to 5. The rating is written to the exif data of the RAW and JPG file. The tool is written in Go and uses the gotk3 library for the GTK3 based GUI. The tool is still in development and has some bugs and performance issues. (See TODO section for more information)
 
-It needs the exiftool to be installed on the system. The exiftool is used to write the rating to the exif data of the CR3 and JPG file.
+It needs the exiftool to be installed on the system. The exiftool is used to write the rating to the exif data of the RAW and JPG file.
 
 ## Installation
 
@@ -20,7 +20,7 @@ It needs the exiftool to be installed on the system. The exiftool is used to wri
 
 
 1. Run the tool
-1. Select the folder containing the CR3 files via the top menu
+1. Select the folder containing the RAW files via the top menu
 1. Cycle through the images
 1. Rate the image with the number keys (0-5)
 1. To see details, click on the image
@@ -30,7 +30,7 @@ It needs the exiftool to be installed on the system. The exiftool is used to wri
 
 This tool was developed with `Go 1.22.4` and tested on Fedora 40. It should work on other GNOME based Linux distros as well, but I haven't tested it.
 
-If you want to contribute, feel free to fork the repository and create a pull request. The Tool should also work for other RAW formats as long as it is supported by exiftool, but I haven't tested it. If you want to use other RAW formats, you have to change the file extension in the code, because it is currently hardcoded to CR3.
+If you want to contribute, feel free to fork the repository and create a pull request. The Tool should also work for other RAW formats as long as it is supported by exiftool, but I haven't tested it. If you encounter any bugs or have feature requests, feel free to open an issue.
 
 ## TODO
 
