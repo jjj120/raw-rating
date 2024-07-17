@@ -41,7 +41,7 @@ func (infoView *InfoView) createWidgets() {
 	// filename
 	infoView.filenameLabel, err = gtk.LabelNew(infoView.filenameVar)
 	infoView.filenameLabel.SetProperty("height-request", lineHeight)
-	infoView.filenameLabel.SetXAlign(SPACE_TO_BORDER)
+	// infoView.filenameLabel.SetXAlign(SPACE_TO_BORDER)
 
 	infoView.gridAttach(infoView.filenameLabel, 1, 1, 2, 1)
 
@@ -181,7 +181,7 @@ func (infoView *InfoView) gridAttach(widget gtk.IWidget, left, top, width, heigh
 
 func (infoView *InfoView) resetVars(currImagePath string) {
 	if currImagePath != "" {
-		infoView.filenameVar = currImagePath
+		infoView.filenameVar = stripFilepath(currImagePath)
 	} else {
 		infoView.filenameVar = ""
 	}
@@ -206,7 +206,7 @@ func (infoView *InfoView) updateExifData(currImagePath string) {
 	exifInfo := fileInfos[0].Fields
 
 	if currImagePath != "" {
-		infoView.filenameVar = currImagePath
+		infoView.filenameVar = stripFilepath(currImagePath)
 	} else {
 		infoView.filenameVar = ""
 	}
@@ -305,4 +305,8 @@ func refreshInfoView() {
 
 func formatDateTime(dateTime string) string {
 	return strings.Replace(dateTime, ":", ".", 2)
+}
+
+func stripFilepath(filepath string) string {
+	return strings.Split(filepath, "/")[len(strings.Split(filepath, "/"))-1]
 }
