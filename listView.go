@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +66,8 @@ func (lv *ListView) refreshListView() {
 
 	for rawFilename, dispFilename := range imageRawToDispMap {
 		lv.addListEntry(rawFilename, dispFilename)
-		// fmt.Println("Added ", rawFilename, "to list with display filename", dispFilename)
+		log.Info("Added ", rawFilename, " to list with display filename ", dispFilename)
+
 	}
 
 	lv.listBox.SetSortFunc(func(row1, row2 *gtk.ListBoxRow) int {
@@ -101,16 +100,14 @@ func getImageMapping(dirName string) map[string]string {
 	// Open the directory
 	d, err := os.Open(dirName)
 	if err != nil {
-		fmt.Printf("Error opening directory: %v\n", err)
-		panic(1)
+		check_error("Error opening directory", err)
 	}
 	defer d.Close()
 
 	// Read the directory entries
 	files, err := d.Readdir(-1)
 	if err != nil {
-		fmt.Printf("Error reading directory entries: %v\n", err)
-		panic(1)
+		check_error("Error reading directory entries", err)
 	}
 
 	// Iterate over the directory entries
@@ -160,7 +157,7 @@ func getLabelTextFromRow(row *gtk.ListBoxRow) string {
 
 	label, ok := child.(*gtk.Label)
 	if !ok {
-		log.Println("The child widget is not a label")
+		log.Debug("The child widget is not a label")
 		return ""
 	}
 

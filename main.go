@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
+	"unsafe"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
 const BOX_SPACING int = 2
@@ -21,6 +23,8 @@ var RAW_SUFFIXES = []string{"360", "3fr", "3g2", "3gp", "3gp2", "3gpp", "7z", "a
 var DISPLAY_SUFFIXES = []string{"jpg", "jpeg", "png"}
 
 const DEFAULT_PATH = "~/Pictures"
+
+var log = logrus.New()
 
 var (
 	et                *exiftool.Exiftool
@@ -39,21 +43,57 @@ var (
 )
 
 func main() {
+	imageDirectory = DEFAULT_PATH
+
+	err = godotenv.Load(".env")
+	if err == nil {
+		newImageDirectory := os.Getenv("START_FOLDER")
+		if imageDirectory != "" {
+			imageDirectory = newImageDirectory
+		}
+	} else {
+		log.Info("No .env file found")
+	}
+
+	log.Out = os.Stderr
+	formatter := new(logrus.TextFormatter)
+
+	formatter.FullTimestamp = true
+	formatter.TimestampFormat = "2006-01-02 15:04:05"
+	formatter.DisableLevelTruncation = true
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+
+	if os.Getenv("DEBUG") == "true" {
+		log.SetLevel(logrus.DebugLevel)
+	} else if os.Getenv("INFO") == "true" {
+		log.SetLevel(logrus.InfoLevel)
+	} else {
+		log.SetLevel(logrus.WarnLevel)
+	}
+
+	// log = logging.MustGetLogger("raw-rating")
+	// format := logging.MustStringFormatter(
+	// 	`%{color}%{time:15:04:05.000} %{shortfunc} ▶  %{level:.1s}-%{id:03x} ▶ %{color:reset} %{message}`,
+	// )
+	// backend := logging.NewLogBackend(os.Stderr, "", 0)
+	// backendFormatter := logging.NewBackendFormatter(backend, format)
+	// backendLeveled := logging.AddModuleLevel(backend)
+	// backendLeveled.SetLevel(logging.ERROR, "raw-rating")
+	// // logging.SetLevel(logging.ERROR, "raw-rating")
+
+	// logging.SetBackend(backendLeveled, backendFormatter)
+
 	const appID = "com.github.jjj120.raw-rating"
-	application, err = gtk.ApplicationNew(appID, glib.APPLICATION_FLAGS_NONE)
+	application, err = gtk.ApplicationNew(appID, glib.APPLICATION_HANDLES_OPEN)
 	check_error("Could not create application:", err)
 
-	err = godotenv.Load()
-	check_error("Could not load dotenv", err)
-
-	imageDirectory = os.Getenv("START_FOLDER")
-	if imageDirectory == "" {
-		imageDirectory = DEFAULT_PATH
-	}
+	application.Connect("open", handleOpen)
 
 	et, err = exiftool.NewExiftool()
 	if err != nil {
-		fmt.Printf("Error when intializing: %v\n", err)
+		check_error("Error when intializing", err)
 		return
 	}
 	defer et.Close()
@@ -79,9 +119,53 @@ func main() {
 	os.Exit(application.Run(os.Args))
 }
 
+func handleOpen(app *gtk.Application, filePtrs unsafe.Pointer, count int, hint string) {
+	// inspired by https://github.com/gotk3/gotk3/issues/787#issue-912938376
+	ptr := (*unsafe.Pointer)(unsafe.Pointer(uintptr(filePtrs) + unsafe.Sizeof(uintptr(0))*uintptr(0)))
+	f := &glib.File{
+		Object: &glib.Object{
+			GObject: glib.ToGObject(*ptr),
+		},
+	}
+	filePath := f.GetPath()
+
+	if filePath == "" {
+		log.Warn("No file path provided")
+		app.Activate()
+		return
+	}
+
+	newImageDirOk := true
+	newImageDirectory := filePath
+	newImageDirectory, err := filepath.Abs(newImageDirectory)
+	if err != nil {
+		check_error("Failed to get absolute path", err)
+		newImageDirOk = false
+	}
+
+	if newImageDirOk {
+		imageDirInfo, err := os.Stat(newImageDirectory)
+		if err != nil {
+			check_error("Failed to stat directory", err)
+			newImageDirOk = false
+		}
+
+		if newImageDirOk && !imageDirInfo.IsDir() {
+			log.Infof("Provided path is not a directory: %s\n", newImageDirectory)
+			newImageDirOk = false
+		}
+	}
+
+	if newImageDirOk {
+		imageDirectory = newImageDirectory
+	}
+
+	app.Activate()
+}
+
 func check_error(message string, err error) {
 	if err != nil {
-		log.Fatal(message, " - ", err)
+		log.Panic(message, " - ", err)
 	}
 }
 
@@ -202,7 +286,7 @@ func setupHeaderBar() {
 
 		if response == gtk.RESPONSE_ACCEPT {
 			imageDirectory = fileChooser.GetFilename()
-			fmt.Println("Selected image dir:", imageDirectory)
+			log.Debug("Selected image dir: ", imageDirectory)
 			refreshAll()
 		}
 
@@ -267,7 +351,7 @@ func keyPress(win *gtk.ApplicationWindow, event *gdk.Event) {
 	case gdk.KEY_Down:
 		nextImage()
 	default:
-		fmt.Println("Key pressed:", keyVal)
+		log.Debug("Key pressed: ", keyVal)
 	}
 	win.ShowAll()
 }
@@ -299,7 +383,7 @@ func incrementImageBy(increment int) {
 
 func changeRating(rating int) {
 	// change rating of the current image
-	// fmt.Println("Change rating of ", currRAWImagePath, "to", rating)
+	log.Debug("Change rating of ", currRAWImagePath, " to ", rating)
 
 	rawArgs := et.ExtractMetadata(currRAWImagePath)
 	rawArgs[0].SetString("Rating", fmt.Sprintf("%d", rating))

@@ -180,6 +180,7 @@ func (infoView *InfoView) gridAttach(widget gtk.IWidget, left, top, width, heigh
 }
 
 func (infoView *InfoView) resetVars(currImagePath string) {
+	log.Debug("Resetting vars of infoView")
 	if currImagePath != "" {
 		infoView.filenameVar = stripFilepath(currImagePath)
 	} else {
@@ -196,7 +197,7 @@ func (infoView *InfoView) resetVars(currImagePath string) {
 }
 
 func (infoView *InfoView) updateExifData(currImagePath string) {
-	// currImagePath := infoView.images[infoView.currIndex][1]
+	log.Debug("Updating exif data in infoView for ", currImagePath)
 
 	fileInfos := et.ExtractMetadata(currImagePath)
 	if len(fileInfos) < 1 {
@@ -273,6 +274,8 @@ func (infoView *InfoView) updateExifData(currImagePath string) {
 }
 
 func (infoView *InfoView) refreshLabels() {
+	log.Debug("Refreshing labels in infoView")
+
 	infoView.filenameLabel.SetText(infoView.filenameVar)
 	infoView.camTypeLabel.SetText(infoView.camTypeVar)
 	infoView.lensTypeLabel.SetText(infoView.lensTypeVar)

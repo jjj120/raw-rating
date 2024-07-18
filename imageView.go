@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/barasher/go-exiftool"
 	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/gtk"
@@ -47,8 +45,7 @@ func NewImageView() *ImageView {
 	iv.image.SetCanFocus(false)
 
 	iv.box.SetSizeRequest(1920, 1080)
-	iv.scrolledWindow.AddEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON1_MOTION_MASK | gdk.SCROLL_MASK))
-	// iv.boxLeft.AddEvents(int(gdk.BUTTON_PRESS_MASK))
+	iv.scrolledWindow.AddEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON1_MOTION_MASK))
 
 	iv.image.Connect("draw", iv.draw)
 	iv.scrolledWindow.Connect("button-press-event", iv.onButtonPress)
@@ -116,10 +113,11 @@ func (iv *ImageView) draw(img *gtk.Image) {
 }
 
 func (iv *ImageView) onButtonPress(sw *gtk.ScrolledWindow, event *gdk.Event) {
-	// fmt.Println("Button Pressed")
 	buttonEvent := gdk.EventButtonNewFromEvent(event)
 
 	if buttonEvent.Button() == gdk.BUTTON_PRIMARY {
+		log.Debug("Button Pressed")
+
 		x, y := buttonEvent.MotionVal()
 		iv.zoomView.valPosX, iv.zoomView.valPosY = (x-iv.xOffset)/(float64(iv.boxLeft.GetAllocatedWidth())-2*iv.xOffset), (y-iv.yOffset)/(float64(iv.boxLeft.GetAllocatedHeight())-2*iv.yOffset)
 		iv.zoomView.QueueDraw()
@@ -127,9 +125,10 @@ func (iv *ImageView) onButtonPress(sw *gtk.ScrolledWindow, event *gdk.Event) {
 }
 
 func (iv *ImageView) onDrag(sw *gtk.ScrolledWindow, event *gdk.Event) {
-	// fmt.Println("Dragging")
 	dragEvent := gdk.EventMotionNewFromEvent(event)
 	if dragEvent.State()&gdk.BUTTON1_MASK != 0 {
+		log.Debug("Dragging")
+
 		x, y := dragEvent.MotionVal()
 		iv.zoomView.valPosX, iv.zoomView.valPosY = (x-iv.xOffset)/(float64(iv.boxLeft.GetAllocatedWidth())-2*iv.xOffset), (y-iv.yOffset)/(float64(iv.boxLeft.GetAllocatedHeight())-2*iv.yOffset)
 		iv.zoomView.QueueDraw()
@@ -142,7 +141,7 @@ func rotatePixbuf(filepath string, pixbuf *gdk.Pixbuf) *gdk.Pixbuf {
 
 	rot, err := metadata[0].GetString("Orientation")
 	if err == exiftool.ErrKeyNotFound {
-		fmt.Println("No orientation found. Defaulting to Horizontal (normal)")
+		log.Debug("No orientation found. Defaulting to Horizontal (normal)")
 		rot = "Horizontal (normal)"
 		err = nil
 	}
@@ -202,6 +201,6 @@ func setupImageView() *ImageView {
 
 func refreshImageView() {
 	imageView.newImagePath = imageRawToDispMap[currRAWImagePath]
-	// fmt.Println("Refreshing image view with new image path: ", imageView.newImagePath, "from raw path: ", currRAWImagePath)
+	log.Debug("Refreshing image view with new image path: ", imageView.newImagePath, "from raw path: ", currRAWImagePath)
 	imageView.image.QueueDraw()
 }

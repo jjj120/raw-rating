@@ -32,6 +32,19 @@ This tool was developed with `Go 1.22.4` and tested on Fedora 40. It should work
 
 If you want to contribute, feel free to fork the repository and create a pull request. The Tool should also work for other RAW formats as long as it is supported by exiftool, but I haven't tested it. If you encounter any bugs or have feature requests, feel free to open an issue.
 
+If you want to get more debugging information, you can set the `DEBUG` or `INFO` environment variable to `"true"` before running the tool.
+
+```bash
+export DEBUG="true"
+./raw-rating <path-to-image-folder>
+```
+
+```bash
+export INFO="true"
+./raw-rating <path-to-image-folder>
+```
+
+
 ## TODO
 
 - [ ] Dynamically loaded image preview in the list
@@ -47,6 +60,7 @@ If you want to contribute, feel free to fork the repository and create a pull re
 - [gotk3](https://github.com/gotk3/gotk3)
 - [exiftool](https://exiftool.org/)
 - [go-exiftool](https://github.com/barasher/go-exiftool)
+- [logrus](https://github.com/sirupsen/logrus)
 - [Go](https://go.dev/)
 
 ## Supported RAW-Formats
