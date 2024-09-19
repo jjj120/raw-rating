@@ -242,6 +242,12 @@ func (infoView *InfoView) updateExifData(currImagePath string) {
 
 	if val, ok := exifInfo["ExposureTime"].(string); ok {
 		infoView.exposureTimeVar = val
+	} else if val, ok := exifInfo["ExposureTime"].(float64); ok {
+		formattedString := strings.Replace(fmt.Sprintf("%.1f", val), ".", "\"", -1)
+		if !strings.Contains(formattedString, "\"") {
+			formattedString += "\""
+		}
+		infoView.exposureTimeVar = formattedString
 	} else {
 		infoView.exposureTimeVar = "Unknown"
 	}
