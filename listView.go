@@ -133,6 +133,14 @@ func getImageMapping(dirName string) map[string]string {
 		}
 	}
 
+	if len(rawFileList) == 0 {
+		log.Fatal("No raw files found in directory, exiting. \nPlease specify the directory in the .env file or as the first argument.")
+	}
+
+	if len(displayFileList) == 0 {
+		log.Fatal("No display files found in directory, exiting. \nPlease specify the directory in the .env file or as the first argument.")
+	}
+
 	// TODO: make this more performant, this is ugly haha
 	fileList := map[string]string{}
 	for _, filenameRAW := range rawFileList {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"unsafe"
 
 	"github.com/barasher/go-exiftool"
@@ -247,13 +248,21 @@ func setupHeaderBar() {
 		log.Fatal("Could not create menu (nil)")
 	}
 
-	// Actions with the prefix 'app' reference actions on the application
-	// Actions with the prefix 'win' reference actions on the current window (specific to ApplicationWindow)
-	// Other prefixes can be added to widgets via InsertActionGroup
 	menu.Append("New Window", "app.new")
 	menu.Append("Open Directory", "custom.open_dir")
 	menu.Append("Close Window", "win.close")
-	menu.Append("Quit", "app.quit")
+	menu.Append("Quit [q]", "app.quit")
+
+	menu_copy_images := glib.MenuNew()
+	if menu_copy_images == nil {
+		log.Fatal("Could not create menu (nil)")
+	}
+
+	menu_copy_images.Append("Copy rated images", "custom.copy_all_rated_images")
+	menu_copy_images.Append("Copy rated display images", "custom.copy_display_rated_images")
+	menu_copy_images.Append("Copy rated raw images", "custom.copy_raw_rated_images")
+
+	menu.AppendSubmenu("Copy rated images", &menu_copy_images.MenuModel)
 
 	// Create the action "win.close"
 	aClose := glib.SimpleActionNew("close", nil)
@@ -267,6 +276,7 @@ func setupHeaderBar() {
 	win.InsertActionGroup("custom", customActionGroup)
 
 	// Create an action in the custom action group
+	// Open directory action
 	aOpenDir := glib.SimpleActionNew("open_dir", nil)
 	aOpenDir.Connect("activate", func() {
 		fileChooser, err := gtk.FileChooserDialogNewWith1Button(
@@ -296,10 +306,167 @@ func setupHeaderBar() {
 	customActionGroup.AddAction(aOpenDir)
 	win.AddAction(aOpenDir)
 
+	// Create an action in the custom action group
+	// Copy all rated images action
+	aCopyAllRatedImages := glib.SimpleActionNew("copy_all_rated_images", nil)
+	aCopyAllRatedImages.Connect("activate", func() {
+		fileChooser, err := gtk.FileChooserDialogNewWith1Button(
+			"Choose the directory to copy to",
+			win,
+			gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+			"Select",
+			gtk.RESPONSE_ACCEPT,
+		)
+
+		if err != nil {
+			log.Fatal("Unable to create file chooser dialog:", err)
+		}
+
+		fileChooser.SetCurrentFolder(imageDirectory)
+
+		// Run the file chooser dialog and check for the response
+		response := fileChooser.Run()
+
+		if response == gtk.RESPONSE_ACCEPT {
+			ratedImageDir := fileChooser.GetFilename()
+			log.Debug("Selected rated image dir: ", ratedImageDir)
+			copyRatedImagesTo(ratedImageDir, nil) // filter is nil -> copy all images
+		}
+
+		// Destroy the file chooser dialog after use
+		fileChooser.Destroy()
+	})
+	customActionGroup.AddAction(aCopyAllRatedImages)
+	win.AddAction(aCopyAllRatedImages)
+
+	// Create an action in the custom action group
+	// Copy rated display images action
+	aCopyRatedDisplayImages := glib.SimpleActionNew("copy_display_rated_images", nil)
+	aCopyRatedDisplayImages.Connect("activate", func() {
+		fileChooser, err := gtk.FileChooserDialogNewWith1Button(
+			"Choose the directory to copy to",
+			win,
+			gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+			"Select",
+			gtk.RESPONSE_ACCEPT,
+		)
+
+		if err != nil {
+			log.Fatal("Unable to create file chooser dialog:", err)
+		}
+
+		fileChooser.SetCurrentFolder(imageDirectory)
+
+		// Run the file chooser dialog and check for the response
+		response := fileChooser.Run()
+
+		if response == gtk.RESPONSE_ACCEPT {
+			ratedImageDir := fileChooser.GetFilename()
+			log.Debug("Selected rated image dir: ", ratedImageDir)
+			copyRatedImagesTo(ratedImageDir, DISPLAY_SUFFIXES)
+		}
+
+		// Destroy the file chooser dialog after use
+		fileChooser.Destroy()
+	})
+	customActionGroup.AddAction(aCopyRatedDisplayImages)
+	win.AddAction(aCopyRatedDisplayImages)
+
+	// Create an action in the custom action group
+	// Copy rated raw images action
+	aCopyRatedRawImages := glib.SimpleActionNew("copy_raw_rated_images", nil)
+	aCopyRatedRawImages.Connect("activate", func() {
+		fileChooser, err := gtk.FileChooserDialogNewWith1Button(
+			"Choose the directory to copy to",
+			win,
+			gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+			"Select",
+			gtk.RESPONSE_ACCEPT,
+		)
+
+		if err != nil {
+			log.Fatal("Unable to create file chooser dialog:", err)
+		}
+
+		fileChooser.SetCurrentFolder(imageDirectory)
+
+		// Run the file chooser dialog and check for the response
+		response := fileChooser.Run()
+
+		if response == gtk.RESPONSE_ACCEPT {
+			ratedImageDir := fileChooser.GetFilename()
+			log.Debug("Selected rated image dir: ", ratedImageDir)
+			copyRatedImagesTo(ratedImageDir, RAW_SUFFIXES)
+		}
+
+		// Destroy the file chooser dialog after use
+		fileChooser.Destroy()
+	})
+	customActionGroup.AddAction(aCopyRatedRawImages)
+	win.AddAction(aCopyRatedRawImages)
+
 	mbtn.SetMenuModel(&menu.MenuModel)
 
 	// add the menu button to the header
 	header.PackStart(mbtn)
+}
+
+func copyRatedImagesTo(ratedImageDir string, filter []string) {
+	// copy all rated images to the new directory
+
+	err := os.MkdirAll(ratedImageDir, os.ModePerm)
+	if err != nil {
+		log.Error("Could not create directory: ", ratedImageDir)
+		return
+	}
+
+	imageDirectoryInfo, err := os.Stat(imageDirectory)
+	if err != nil {
+		log.Error("Could not stat directory: ", imageDirectory)
+		return
+	}
+
+	if !imageDirectoryInfo.IsDir() {
+		log.Error("Provided path is not a directory: ", imageDirectory)
+		return
+	}
+
+	imageFiles, err := os.ReadDir(imageDirectory)
+	if err != nil {
+		log.Error("Could not read directory: ", imageDirectory)
+		return
+	}
+
+	for _, imageFile := range imageFiles {
+		if imageFile.IsDir() {
+			continue
+		}
+
+		if filter != nil {
+			suffix := filepath.Ext(imageFile.Name())
+
+			if !slices.Contains(filter, suffix) {
+				continue
+			}
+		}
+
+		imageFilePath := imageDirectory + "/" + imageFile.Name()
+		rawArgs := et.ExtractMetadata(imageFilePath)
+		rating, err := rawArgs[0].GetInt("Rating")
+		if err != nil {
+			log.Warn("Could not get rating of ", imageFilePath)
+			continue
+		}
+
+		if rating > 0 {
+			// copy the file
+			newFilePath := ratedImageDir + "/" + imageFile.Name()
+			err = os.Link(imageFilePath, newFilePath)
+			if err != nil {
+				log.Error("Could not copy ", imageFilePath, " to ", newFilePath)
+			}
+		}
+	}
 }
 
 // filesSelected: callback function for "file-set" signal
