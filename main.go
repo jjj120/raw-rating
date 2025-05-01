@@ -41,6 +41,7 @@ var (
 	imageView         *ImageView
 	header            *gtk.HeaderBar
 	err               error
+	isFullscreen      bool
 )
 
 func main() {
@@ -214,6 +215,12 @@ func setupWindow(application *gtk.Application) *gtk.ApplicationWindow {
 	// Add the vertical box and the right label to the horizontal box
 	box.PackStart(vBox, false, false, 10)
 	box.PackStart(imageView.box, true, true, 10)
+
+	// Connect to the window state event to check for fullscreen
+	win.Connect("window-state-event", func(_ *gtk.ApplicationWindow, ev *gdk.Event) {
+		state := gdk.EventWindowStateNewFromEvent(ev).NewWindowState()
+		isFullscreen = ((state & gdk.WINDOW_STATE_FULLSCREEN) != 0)
+	})
 
 	// Connect to key presses
 	win.Connect("key-press-event", keyPress)
@@ -517,6 +524,14 @@ func keyPress(win *gtk.ApplicationWindow, event *gdk.Event) {
 		prevImage()
 	case gdk.KEY_Down:
 		nextImage()
+	case gdk.KEY_F11:
+		if isFullscreen {
+			win.Unfullscreen()
+		} else {
+			win.Fullscreen()
+		}
+	case gdk.KEY_F5:
+		refreshAll()
 	default:
 		log.Debug("Key pressed: ", keyVal)
 	}
